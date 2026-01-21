@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot 
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -23,16 +23,12 @@ export function usePrivateTodos(userId) {
       return
     }
 
-    const q = query(
-      collection(db, 'privateTodos'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    )
+    const q = query(collection(db, 'users', userId, 'todos'), orderBy('createdAt', 'desc'))
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const todosData = snapshot.docs.map(doc => ({
+      const todosData = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }))
       setTodos(todosData)
       setLoading(false)
@@ -46,15 +42,16 @@ export function usePrivateTodos(userId) {
 
   const addTodo = async (text) => {
     if (!userId) return null
-    
+
     try {
+      const cleanedText = text.trim()
+      if (!cleanedText) return null
       const newTodo = {
-        text: text.trim(),
+        text: cleanedText,
         completed: false,
-        userId,
-        createdAt: new Date().toISOString()
+        createdAt: serverTimestamp(),
       }
-      const docRef = await addDoc(collection(db, 'privateTodos'), newTodo)
+      const docRef = await addDoc(collection(db, 'users', userId, 'todos'), newTodo)
       return docRef.id
     } catch (error) {
       console.error('Error adding todo:', error)
@@ -64,7 +61,7 @@ export function usePrivateTodos(userId) {
 
   const updateTodo = async (id, updates) => {
     try {
-      const todoRef = doc(db, 'privateTodos', id)
+      const todoRef = doc(db, 'users', userId, 'todos', id)
       await updateDoc(todoRef, updates)
     } catch (error) {
       console.error('Error updating todo:', error)
@@ -73,12 +70,12 @@ export function usePrivateTodos(userId) {
   }
 
   const toggleTodo = async (id, completed) => {
-    await updateTodo(id, { completed: !completed })
+    await updateTodo(id, { completed })
   }
 
   const deleteTodo = async (id) => {
     try {
-      await deleteDoc(doc(db, 'privateTodos', id))
+      await deleteDoc(doc(db, 'users', userId, 'todos', id))
     } catch (error) {
       console.error('Error deleting todo:', error)
       throw error
